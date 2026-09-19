@@ -21,9 +21,23 @@ def format_history(messages: list) -> list:
             formatted.append(AIMessage(content=msg["content"]))
     return formatted
 
+def check_dnc(phone: str) -> bool:
+    """Stub for Do Not Call registry check."""
+    logger.info(f"Checking DNC register for {phone}")
+    # Assume our test leads are clean
+    return False
+
 def greeting_node(state: CallState) -> dict:
     """The initial greeting node."""
     logger.info(f"Executing greeting_node for session {state.get('session_id')}")
+    
+    # Simulate a DNC check before we even speak
+    test_phone = state.get("extracted_fields", {}).get("phone", "+6145550199")
+    if check_dnc(test_phone):
+        return {
+            "messages": [{"role": "assistant", "content": "I'm sorry, but this number is on the Do Not Call register. We will end the call now."}],
+            "current_node": "end"
+        }
     
     script = PITCH_SCRIPT.get("greeting", {})
     greeting_text = script.get("prompt", "Hello, how can I help you?")
@@ -79,6 +93,30 @@ class AskFieldNode:
             extraction_prompt = SystemMessage(content=f"Extract the requested information based on the conversation. We are looking for: {self.prompt_context}")
             
             try:
+                # First, check if the user is refusing to proceed, saying no, or declining.
+                decline_check_prompt = SystemMessage(content="Analyze the user's latest response. Are they refusing to answer, declining consent, saying 'no', or asking to stop the call? Respond with ONLY 'YES' or 'NO'.")
+                decline_result = chat_llm.invoke([decline_check_prompt] + [HumanMessage(content=last_message["content"])])
+                
+                if "YES" in decline_result.content.upper():
+                    logger.info("User declined or said no. Respecting no.")
+                    decline_script = PITCH_SCRIPT.get("decline", {})
+                    return {
+                        "messages": [{"role": "assistant", "content": decline_script.get("prompt", "Thank you for your time. Goodbye.")}],
+                        "current_node": "end"
+                    }
+
+                # Also enforce guardrails: no advice, no credit cards
+                guardrail_check_prompt = SystemMessage(content="Analyze the user's latest response. Are they asking for financial advice, product advice, or providing credit card/payment details? Respond with ONLY 'YES' or 'NO'.")
+                guardrail_result = chat_llm.invoke([guardrail_check_prompt] + [HumanMessage(content=last_message["content"])])
+                
+                if "YES" in guardrail_result.content.upper():
+                    logger.warning("Guardrail triggered: user asked for advice or provided payment info.")
+                    return {
+                        "needs_handoff": True,
+                        "handoff_reason": "Customer requested advice or provided payment details.",
+                        "current_node": "handoff_node"
+                    }
+
                 # Run extraction
                 result = self.extractor.invoke([extraction_prompt] + history)
                 
@@ -140,8 +178,13 @@ def handoff_node(state: CallState) -> dict:
     reason = state.get("handoff_reason", "Customer requested human agent.")
     logger.warning(f"HANDOFF TRIGGERED. Reason: {reason}. Collected fields: {state.get('extracted_fields')}")
     
+    if "payment details" in reason.lower() or "advice" in reason.lower():
+        msg = "I am an AI and cannot provide financial advice or collect payment information securely. Let me transfer you to a human expert."
+    else:
+        msg = "I completely understand. Let me transfer you to one of our human energy experts who can help you further. Please hold on a moment."
+        
     return {
-        "messages": [{"role": "assistant", "content": "I completely understand. Let me transfer you to one of our human energy experts who can help you further. Please hold on a moment."}],
+        "messages": [{"role": "assistant", "content": msg}],
         "current_node": "handoff_node"
     }
 
