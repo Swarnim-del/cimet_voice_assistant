@@ -13,15 +13,8 @@ const QueuePage = () => {
   const fetchLeads = async () => {
     setLoading(true);
     try {
-      // We will mock this until the backend endpoint is ready
-      // const response = await axios.get(`${API_URL}/api/crm/leads`);
-      // setLeads(response.data);
-      
-      // Mock data for now based on the spec
-      setLeads([
-        { session_id: "L-102", customer: "John Doe", phone: "+61455501999", journey: "Energy Switch", reason: "Life Support", status: "Waiting" },
-        { session_id: "L-103", customer: "Sarah Lee", phone: "+61412345678", journey: "Moving Home", reason: "Manual Review", status: "Pending" }
-      ]);
+      const response = await axios.get(`${API_URL}/api/crm/leads`);
+      setLeads(response.data);
     } catch (err) {
       console.error("Failed to fetch leads", err);
     } finally {
