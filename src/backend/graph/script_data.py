@@ -32,7 +32,7 @@ PITCH_SCRIPT = {
         "fallback": "decline_node"
     },
 
-    "moving_status_node": {
+    "is_moving_node": {
         "prompt": (
             "Great, thank you. "
             "Just to understand your situation, are you moving into a new property, "
@@ -60,7 +60,7 @@ PITCH_SCRIPT = {
         "next": "solar_node"
     },
 
-    "solar_node": {
+    "has_solar_node": {
         "prompt": (
             "One quick question — does the property currently have solar panels installed?"
         ),
@@ -68,7 +68,7 @@ PITCH_SCRIPT = {
         "next": "life_support_node"
     },
 
-    "life_support_node": {
+    "has_life_support_node": {
         "prompt": (
             "Thank you. "
             "Does anyone living at the property rely on electrically powered life support equipment?"
@@ -77,7 +77,7 @@ PITCH_SCRIPT = {
         "next": "concession_node"
     },
 
-    "concession_node": {
+    "concession_card_node": {
         "prompt": (
             "Almost done. "
             "Do you currently hold a valid government concession or pensioner card?"

@@ -39,7 +39,7 @@ def greeting_node(state: CallState) -> dict:
             "current_node": "end"
         }
     
-    script = PITCH_SCRIPT.get("greeting", {})
+    script = PITCH_SCRIPT.get("greeting_node", {})
     greeting_text = script.get("prompt", "Hello, how can I help you?")
     
     prompt = f"""
@@ -131,7 +131,7 @@ class AskFieldNode:
                     new_fields.update(extracted_dict)
                     
                     # Generate natural transition to the next field (if not complete)
-                    next_script = PITCH_SCRIPT.get(self.next_node.replace("_node", ""), {})
+                    next_script = PITCH_SCRIPT.get(self.next_node, {})
                     next_question = next_script.get("prompt", self._get_next_question())
                     
                     transition_prompt = f"The user just provided their {self.field_name}. Acknowledge it briefly and naturally ask the next question exactly as written: {next_question}"
@@ -156,7 +156,7 @@ class AskFieldNode:
                 "current_node": "handoff_node"
             }
             
-        script = PITCH_SCRIPT.get(self.field_name, {})
+        script = PITCH_SCRIPT.get(f"{self.field_name}_node", {})
         exact_question = script.get("prompt", self.prompt_context)
         
         ask_prompt = f"Ask the user exactly: '{exact_question}'. Be polite and concise."

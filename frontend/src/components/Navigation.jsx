@@ -6,7 +6,7 @@ const Navigation = () => {
     <nav className="bg-white border-b border-[#E5E7EB] px-8 py-4 mb-8">
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <div className="text-xl font-bold text-[#0A5BFF]">CIMET CRM</div>
+          <div className="text-xl font-bold text-[#0A5BFF]">CIMET PULSE</div>
           <div className="flex gap-4">
             <NavLink 
               to="/" 

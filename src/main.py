@@ -118,6 +118,17 @@ async def voice_websocket(websocket: WebSocket, session_id: str):
             await websocket.close()
         except:
             pass
+    finally:
+        import json
+        logs_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        log_path = os.path.join(logs_dir, f"{session_id}.json")
+        try:
+            with open(log_path, "w") as f:
+                json.dump(state, f, indent=2)
+            logger.info(f"Saved call log to {log_path}")
+        except Exception as e:
+            logger.error(f"Failed to save call log: {e}")
 
 @app.get("/health")
 async def health_check():

@@ -10,7 +10,7 @@ const ReviewPage = () => {
     <div className="p-8 max-w-4xl mx-auto flex flex-col gap-8 h-screen">
       <header className="flex flex-col mb-4">
         <h1 className="text-2xl font-bold text-[#111827]">Application Review</h1>
-        <p className="text-[#6B7280] text-sm mt-1">Review the collected details before submitting to the CRM. Lead ID: {id}</p>
+        <p className="text-[#6B7280] text-sm mt-1">Review the collected details before submitting to PULSE. Lead ID: {id}</p>
       </header>
 
       <div className="crm-card bg-white flex flex-col">
@@ -35,13 +35,13 @@ const ReviewPage = () => {
         </button>
         <button 
           onClick={() => {
-            alert("Submitted to CRM successfully!");
+            alert("Submitted to PULSE successfully!");
             navigate('/');
           }}
           className="flex items-center gap-2 bg-[#0A5BFF] text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-blue-700 shadow-sm"
         >
           <CheckCircle size={18} />
-          Submit to CRM
+          Submit to PULSE
         </button>
       </div>
     </div>

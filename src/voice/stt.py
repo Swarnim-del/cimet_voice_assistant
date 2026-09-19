@@ -17,6 +17,7 @@ class WhisperSTT:
         with open(audio_filepath, "rb") as audio_file:
             transcript = await self.client.audio.transcriptions.create(
                 model="whisper-1",
-                file=audio_file
+                file=audio_file,
+                language="en"
             )
         return transcript.text
