@@ -31,5 +31,18 @@ services:
       timeout: 5s
       retries: 5
 
+  frontend:
+    build: ./frontend
+    container_name: cimet-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
