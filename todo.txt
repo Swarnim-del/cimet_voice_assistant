@@ -1,0 +1,30 @@
+
+Development roadmap (atomic)
+
+Phase 0 — Project skeleton
+
+Repo, FastAPI, React, Docker, Poetry/uv, linting
+
+Phase 1 — Conversation contract
+
+CallState, field schema, node definitions, API contracts
+
+Phase 2 — Voice pipeline
+
+Audio → STT → transcript → timestamps
+
+Phase 3 — PostgreSQL
+
+Tables, SQLAlchemy models, persistence
+
+Phase 4 — LangGraph
+
+State graph, nodes, transitions, checkpointing
+
+Phase 5 — Observability
+
+Structured logs, traces, metrics
+
+Phase 6 — Docker & demo
+
+Compose, local deployment, sample call

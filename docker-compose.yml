@@ -1,0 +1,35 @@
+services:
+  api:
+    build: .
+    container_name: cimet-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://cimet_user:cimet_password@db:5432/cimet_db
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+
+  db:
+    image: postgres:15-alpine
+    container_name: cimet-postgres
+    environment:
+      POSTGRES_USER: cimet_user
+      POSTGRES_PASSWORD: cimet_password
+      POSTGRES_DB: cimet_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cimet_user -d cimet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

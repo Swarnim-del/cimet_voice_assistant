@@ -1,0 +1,21 @@
+[project]
+name = "cimet"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Swarnim Kamal", email = "swarnimkamal9@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "fastapi>=0.141.1",
+    "greenlet>=3.5.6",
+    "langchain-google-genai>=4.4.0",
+    "langgraph>=1.2.11",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.3",
+    "sqlalchemy>=2.0.54",
+    "uvicorn>=0.53.0",
+]
+
