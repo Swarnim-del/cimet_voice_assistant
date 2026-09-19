@@ -6,6 +6,8 @@ from src.voice.tts import OpenAITTS
 from src.backend.graph.builder import app as graph_app
 from src.backend.schemas.state import CallState
 from src.logger import logger
+from src.backend.repo.database import db
+from src.backend.repo.models import CallSession, Message, Lead
 
 class VoiceOrchestrator:
     def __init__(self):
@@ -26,7 +28,22 @@ class VoiceOrchestrator:
         transcript = await self.stt.transcribe(audio_filepath)
         logger.info(f"[{session_id}] Extracted Transcript: {transcript}")
         
-        # 2. Add to state and invoke Graph (Conversation Service)
+        # 2. Persist Customer Message
+        async with db.async_session_maker() as db_session:
+            call_sess = await db_session.get(CallSession, session_id)
+            if not call_sess:
+                lead = await db_session.get(Lead, "L_WS_100")
+                if not lead:
+                    lead = Lead(lead_id="L_WS_100", customer_name="Test User", phone="555", email="x@x.com", last_completed_step="none")
+                    db_session.add(lead)
+                call_sess = CallSession(session_id=session_id, lead_id="L_WS_100")
+                db_session.add(call_sess)
+            
+            user_msg = Message(session_id=session_id, speaker="Customer", transcript=transcript)
+            db_session.add(user_msg)
+            await db_session.commit()
+            
+        # 3. Add to state and invoke Graph (Conversation Service)
         if "messages" not in state:
             state["messages"] = []
             
@@ -38,7 +55,28 @@ class VoiceOrchestrator:
         ai_response = updated_state["messages"][-1]["content"] if updated_state.get("messages") else "I'm sorry, I didn't get that."
         logger.info(f"[{session_id}] AI Text Response: {ai_response}")
         
-        # 3. Synthesize Speech (Voice Service)
+        # 4. Persist AI Message and Update Session
+        async with db.async_session_maker() as db_session:
+            ai_msg = Message(session_id=session_id, speaker="AI", transcript=ai_response)
+            db_session.add(ai_msg)
+            
+            call_sess = await db_session.get(CallSession, session_id)
+            if call_sess:
+                call_sess.current_node = updated_state.get("current_node", call_sess.current_node)
+                if call_sess.current_node == "handoff_node":
+                    call_sess.status = "HANDED_OFF"
+                    call_sess.handoff_reason = updated_state.get("handoff_reason", "Customer requested handoff.")
+            
+            await db_session.commit()
+            
+        # Write transcript state to JSON file in logs directory
+        import json
+        logs_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        with open(os.path.join(logs_dir, f"{session_id}.json"), "w") as f:
+            json.dump(updated_state, f, indent=2)
+        
+        # 5. Synthesize Speech (Voice Service)
         temp_dir = tempfile.gettempdir()
         output_filepath = os.path.join(temp_dir, f"{session_id}_response_{uuid.uuid4().hex[:6]}.wav")
         

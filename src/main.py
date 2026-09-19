@@ -11,8 +11,12 @@ from src.logger import logger
 from src.backend.deps import get_db
 from src.backend.graph.builder import app as graph_app
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, List
 from src.voice.orchestrator import VoiceOrchestrator
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.future import select
+from sqlalchemy import desc
+from src.backend.repo.models import CallSession, Message
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -22,6 +26,14 @@ app = FastAPI(
     title="CIMET Voice Assistant API",
     description="Backend for the CIMET Hackathon AI voice assistant",
     version="0.1.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize Voice Orchestrator
@@ -152,3 +164,18 @@ async def chat_endpoint(request: ChatRequest):
 async def db_check(db: AsyncSession = Depends(get_db)):
     logger.info("DB check endpoint called")
     return {"status": "ok", "db_url_configured": bool(settings.database_url)}
+
+# ---------------------------------------------------------
+# Logs API for Observability Dashboard
+# ---------------------------------------------------------
+@app.get("/api/logs/sessions")
+async def get_sessions(db: AsyncSession = Depends(get_db)):
+    stmt = select(CallSession).order_by(desc(CallSession.session_id))
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+@app.get("/api/logs/sessions/{session_id}/messages")
+async def get_messages(session_id: str, db: AsyncSession = Depends(get_db)):
+    stmt = select(Message).where(Message.session_id == session_id).order_by(Message.id)
+    result = await db.execute(stmt)
+    return result.scalars().all()

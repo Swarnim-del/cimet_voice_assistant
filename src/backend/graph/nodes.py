@@ -5,6 +5,7 @@ from langchain_openai import ChatOpenAI
 from src.backend.schemas.state import CallState
 from src.backend.config import settings
 from src.logger import logger
+from src.backend.graph.script_data import PITCH_SCRIPT
 
 # Initialize the LLM
 llm = ChatOpenAI(model="gpt-5-mini", temperature=0.1, api_key=settings.openai_api_key)
@@ -24,7 +25,10 @@ def greeting_node(state: CallState) -> dict:
     """The initial greeting node."""
     logger.info(f"Executing greeting_node for session {state.get('session_id')}")
     
-    prompt = """
+    script = PITCH_SCRIPT.get("greeting", {})
+    greeting_text = script.get("prompt", "Hello, how can I help you?")
+    
+    prompt = f"""
 You are Aarav, an AI energy expert at CIMET.
 The customer has requested an energy comparison but hasn't completed it.
 
@@ -32,7 +36,7 @@ Your goal for this first message:
 1. Introduce yourself warmly and professionally.
 2. Acknowledge they were comparing energy plans.
 3. Strongly assure them that their data and privacy are strictly protected and kept secure.
-4. Ask the very first question: "Are you moving into a new property or staying at your current address?"
+4. Ask the very first question EXACTLY as written: "{greeting_text}"
 
 Keep it conversational, trustworthy, and engaging. DO NOT ask more than one question.
 
@@ -89,7 +93,10 @@ class AskFieldNode:
                     new_fields.update(extracted_dict)
                     
                     # Generate natural transition to the next field (if not complete)
-                    transition_prompt = f"The user just provided their {self.field_name}. Acknowledge it briefly and naturally ask the next question: {self._get_next_question()}"
+                    next_script = PITCH_SCRIPT.get(self.next_node.replace("_node", ""), {})
+                    next_question = next_script.get("prompt", self._get_next_question())
+                    
+                    transition_prompt = f"The user just provided their {self.field_name}. Acknowledge it briefly and naturally ask the next question exactly as written: {next_question}"
                     response = chat_llm.invoke([SystemMessage(content=transition_prompt)] + history)
                     
                     return {
@@ -111,9 +118,12 @@ class AskFieldNode:
                 "current_node": "handoff_node"
             }
             
-        ask_prompt = f"Ask the user: {self.prompt_context}. Be polite and concise."
+        script = PITCH_SCRIPT.get(self.field_name, {})
+        exact_question = script.get("prompt", self.prompt_context)
+        
+        ask_prompt = f"Ask the user exactly: '{exact_question}'. Be polite and concise."
         if retry_count > 0:
-            ask_prompt = f"The user didn't provide a clear answer. Politely re-ask: {self.prompt_context}"
+            ask_prompt = f"The user didn't provide a clear answer. Politely re-ask: '{exact_question}'"
             
         response = chat_llm.invoke([SystemMessage(content=ask_prompt)] + format_history(state.get("messages", [])))
         
@@ -123,16 +133,7 @@ class AskFieldNode:
         }
         
     def _get_next_question(self) -> str:
-        # Simple mapping for natural transitions
-        mapping = {
-            "address_node": "What is the full address of the property?",
-            "fuel_type_node": "Are you looking for Electricity, Gas, or Both?",
-            "has_solar_node": "Does the property have solar panels?",
-            "has_life_support_node": "Does anyone at the property rely on life support equipment?",
-            "concession_card_node": "Do you hold a valid government concession or pensioner card?",
-            "complete_journey": "No more questions, let them know you are pulling up the best plans now."
-        }
-        return mapping.get(self.next_node, "Next question.")
+        return "Next question."
 
 def handoff_node(state: CallState) -> dict:
     """Handles the handoff logic."""
