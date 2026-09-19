@@ -2,7 +2,7 @@ import uuid
 import os
 import tempfile
 from src.voice.stt import WhisperSTT
-from src.voice.tts import KokoroTTS
+from src.voice.tts import OpenAITTS
 from src.backend.graph.builder import app as graph_app
 from src.backend.schemas.state import CallState
 from src.logger import logger
@@ -10,7 +10,7 @@ from src.logger import logger
 class VoiceOrchestrator:
     def __init__(self):
         self.stt = WhisperSTT()
-        self.tts = KokoroTTS()
+        self.tts = OpenAITTS()
 
     async def handle_audio(self, audio_filepath: str, session_id: str, state: CallState) -> tuple[str, CallState]:
         """

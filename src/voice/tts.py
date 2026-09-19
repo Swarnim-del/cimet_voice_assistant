@@ -1,34 +1,28 @@
 import os
 import soundfile as sf
 import numpy as np
-try:
-    from kokoro_onnx import Kokoro
-except ImportError:
-    Kokoro = None
+from openai import AsyncOpenAI
 
-class KokoroTTS:
-    def __init__(self, model_path="kokoro-v0_19.onnx", voices_path="voices.bin"):
-        self.enabled = False
-        if Kokoro is not None and os.path.exists(model_path) and os.path.exists(voices_path):
-            self.kokoro = Kokoro(model_path, voices_path)
-            self.enabled = True
-        else:
-            print("[WARNING] Kokoro TTS not fully initialized. Missing ONNX model/voices. Using mock fallback.")
+class OpenAITTS:
+    def __init__(self):
+        self.client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
     async def synthesize(self, text: str, output_filepath: str):
         """
-        Synthesize speech from text and save to output_filepath.
+        Synthesize speech from text using OpenAI TTS and save to output_filepath.
         """
-        if self.enabled:
-            # Generate speech
-            samples, sample_rate = self.kokoro.create(text, voice="af_sarah", speed=1.0, lang="en-us")
+        if not os.environ.get("OPENAI_API_KEY"):
+            print(f"[MOCK TTS] Synthesizing text to {output_filepath}: {text}")
+            sample_rate = 24000
+            samples = np.zeros((sample_rate,))
             sf.write(output_filepath, samples, sample_rate)
             return output_filepath
             
-        # Fallback mock if weights aren't downloaded
-        print(f"[MOCK TTS] Synthesizing text to {output_filepath}: {text}")
-        # Create a dummy silent wav file (1 second at 24kHz)
-        sample_rate = 24000
-        samples = np.zeros((sample_rate,))
-        sf.write(output_filepath, samples, sample_rate)
+        print(f"[OpenAI TTS] Generating audio for: {text}")
+        response = await self.client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=text
+        )
+        response.stream_to_file(output_filepath)
         return output_filepath

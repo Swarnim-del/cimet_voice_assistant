@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CIMET Voice Assistant</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; background: #0B1020; color: white; }
+        button { padding: 12px 24px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 8px; border: none; margin: 10px 0; }
+        #startBtn { background: #2563EB; color: white; }
+        #stopBtn { background: #DC2626; color: white; display: none; }
+        .log-box { background: #1E293B; padding: 20px; border-radius: 8px; margin-top: 20px; min-height: 200px; overflow-y: auto; font-family: monospace; }
+        .status { color: #10B981; font-weight: bold; margin-bottom: 20px; }
+        .thinking { color: #F59E0B; }
+    </style>
+</head>
+<body>
+    <h1>🔋 CIMET Voice Testing UI</h1>
+    <p>Click start, speak into your microphone, and wait for the AI to respond!</p>
+    
+    <div id="status" class="status">Disconnected</div>
+    
+    <button id="startBtn">🎤 Start Recording</button>
+    <button id="stopBtn">⏹️ Stop & Send</button>
+
+    <h3>Interaction Logs</h3>
+    <div class="log-box" id="logs"></div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let ws;
+        const sessionId = "browser_test_" + Math.floor(Math.random() * 10000);
+        
+        const logs = document.getElementById('logs');
+        const status = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+
+        function log(msg, className='') {
+            logs.innerHTML += `<div class="${className}">> ${msg}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // Initialize WebSocket
+        function initWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws/voice/${sessionId}`);
+            
+            ws.onopen = () => {
+                status.innerText = "Connected to Voice Service";
+                log("WebSocket Connected: " + sessionId);
+            };
+            
+            ws.onmessage = async (event) => {
+                log("Received TTS audio response from AI!", "status");
+                
+                // The server sends back binary audio data (.wav)
+                const audioBlob = new Blob([event.data], { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.play();
+                
+                log("Playing audio response...");
+            };
+            
+            ws.onerror = (e) => log("WebSocket Error!", "thinking");
+            ws.onclose = () => log("WebSocket Closed.");
+        }
+
+        startBtn.onclick = async () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                initWebSocket();
+            }
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    log("Processing audio...", "thinking");
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    
+                    // Send binary audio blob over WebSocket
+                    ws.send(audioBlob);
+                    log(`Sent ${audioBlob.size} bytes of audio to LangGraph`);
+                };
+
+                mediaRecorder.start();
+                startBtn.style.display = "none";
+                stopBtn.style.display = "inline-block";
+                log("Recording started... Speak now!");
+                
+            } catch (err) {
+                log("Error accessing microphone: " + err, "thinking");
+            }
+        };
+
+        stopBtn.onclick = () => {
+            mediaRecorder.stop();
+            startBtn.style.display = "inline-block";
+            stopBtn.style.display = "none";
+        };
+
+        // Connect initially
+        initWebSocket();
+    </script>
+</body>
+</html>

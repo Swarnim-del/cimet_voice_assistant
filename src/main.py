@@ -2,6 +2,8 @@ import os
 import tempfile
 import aiofiles
 from fastapi import FastAPI, Depends, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.backend.config import settings
@@ -29,6 +31,14 @@ voice_orchestrator = VoiceOrchestrator()
 async def startup_event():
     logger.info("Starting up CIMET Voice Assistant API")
 
+# Mount the static directory for the browser UI
+import os
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+@app.get("/")
+async def get_ui():
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 # ---------------------------------------------------------
 # Voice Service API (Audio Only)
