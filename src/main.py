@@ -16,7 +16,7 @@ from src.voice.orchestrator import VoiceOrchestrator
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.future import select
 from sqlalchemy import desc
-from src.backend.repo.models import CallSession, Message
+from src.backend.repo.models import CallSession, ConversationMessage
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -176,6 +176,10 @@ async def get_sessions(db: AsyncSession = Depends(get_db)):
 
 @app.get("/api/logs/sessions/{session_id}/messages")
 async def get_messages(session_id: str, db: AsyncSession = Depends(get_db)):
-    stmt = select(Message).where(Message.session_id == session_id).order_by(Message.id)
+    stmt = select(ConversationMessage).where(ConversationMessage.session_id == session_id).order_by(ConversationMessage.id)
     result = await db.execute(stmt)
     return result.scalars().all()
+
+from src.backend.crm.router import router as crm_router
+
+app.include_router(crm_router, prefix="/api/crm", tags=["CRM"])

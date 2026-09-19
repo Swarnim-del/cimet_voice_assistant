@@ -7,7 +7,8 @@ from src.backend.graph.builder import app as graph_app
 from src.backend.schemas.state import CallState
 from src.logger import logger
 from src.backend.repo.database import db
-from src.backend.repo.models import CallSession, Message, Lead
+from src.backend.repo.models import CallSession, ConversationMessage, Customer, JourneyData
+from src.backend.crm.websocket import manager
 
 class VoiceOrchestrator:
     def __init__(self):
@@ -32,16 +33,23 @@ class VoiceOrchestrator:
         async with db.async_session_maker() as db_session:
             call_sess = await db_session.get(CallSession, session_id)
             if not call_sess:
-                lead = await db_session.get(Lead, "L_WS_100")
-                if not lead:
-                    lead = Lead(lead_id="L_WS_100", customer_name="Test User", phone="555", email="x@x.com", last_completed_step="none")
-                    db_session.add(lead)
-                call_sess = CallSession(session_id=session_id, lead_id="L_WS_100")
+                customer = await db_session.get(Customer, "L_WS_100")
+                if not customer:
+                    customer = Customer(id="L_WS_100", lead_id="LEAD_TEST", name="John Doe", phone="555")
+                    db_session.add(customer)
+                call_sess = CallSession(session_id=session_id, customer_id="L_WS_100")
                 db_session.add(call_sess)
             
-            user_msg = Message(session_id=session_id, speaker="Customer", transcript=transcript)
+            user_msg = ConversationMessage(session_id=session_id, speaker="customer", text=transcript)
             db_session.add(user_msg)
             await db_session.commit()
+            
+        # Broadcast to CRM
+        await manager.broadcast(session_id, {
+            "type": "transcript",
+            "speaker": "customer",
+            "text": transcript
+        })
             
         # 3. Add to state and invoke Graph (Conversation Service)
         if "messages" not in state:
@@ -57,17 +65,44 @@ class VoiceOrchestrator:
         
         # 4. Persist AI Message and Update Session
         async with db.async_session_maker() as db_session:
-            ai_msg = Message(session_id=session_id, speaker="AI", transcript=ai_response)
+            ai_msg = ConversationMessage(session_id=session_id, speaker="ai", text=ai_response)
             db_session.add(ai_msg)
             
             call_sess = await db_session.get(CallSession, session_id)
             if call_sess:
                 call_sess.current_node = updated_state.get("current_node", call_sess.current_node)
                 if call_sess.current_node == "handoff_node":
-                    call_sess.status = "HANDED_OFF"
-                    call_sess.handoff_reason = updated_state.get("handoff_reason", "Customer requested handoff.")
+                    call_sess.status = "LIVE"
+                    call_sess.escalation_reason = updated_state.get("handoff_reason", "Customer requested handoff.")
             
+            # Update JourneyData
+            fields = updated_state.get("extracted_fields", {})
+            if fields:
+                journey = await db_session.get(JourneyData, session_id)
+                if not journey:
+                    journey = JourneyData(session_id=session_id)
+                    db_session.add(journey)
+                if "moving" in fields: journey.moving = fields["moving"]
+                if "address" in fields: journey.address = fields["address"]
+                if "fuel_type" in fields: journey.fuel_type = fields["fuel_type"]
+                if "solar" in fields: journey.solar = fields["solar"]
+                if "life_support" in fields: journey.life_support = fields["life_support"]
+                if "concession" in fields: journey.concession = fields["concession"]
+                
             await db_session.commit()
+            
+        # Broadcast AI Transcript to CRM
+        await manager.broadcast(session_id, {
+            "type": "transcript",
+            "speaker": "ai",
+            "text": ai_response
+        })
+        
+        # Broadcast Journey Update to CRM
+        await manager.broadcast(session_id, {
+            "type": "journey_update",
+            "fields": updated_state.get("extracted_fields", {})
+        })
             
         # Write transcript state to JSON file in logs directory
         import json

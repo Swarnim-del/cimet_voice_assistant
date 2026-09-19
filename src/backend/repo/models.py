@@ -1,68 +1,62 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 
 from src.backend.repo.database import Base
 
 
-class Lead(Base):
-    __tablename__ = "leads"
+class Customer(Base):
+    __tablename__ = "customers"
 
-    lead_id = Column(String, primary_key=True, index=True)
-    customer_name = Column(String, nullable=False)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    lead_id = Column(String, nullable=False, unique=True, index=True)
+    name = Column(String, nullable=False)
     phone = Column(String, nullable=False)
-    email = Column(String, nullable=False)
-    last_completed_step = Column(String, nullable=False)
+    postcode = Column(String, nullable=True)
     
-    call_sessions = relationship("CallSession", back_populates="lead")
+    call_sessions = relationship("CallSession", back_populates="customer")
 
 
 class CallSession(Base):
     __tablename__ = "call_sessions"
 
     session_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    lead_id = Column(String, ForeignKey("leads.lead_id"), nullable=False)
-    current_node = Column(String, nullable=False, default="start")
-    status = Column(String, nullable=False, default="ACTIVE")
-    retry_count = Column(Integer, nullable=False, default=0)
-    sentiment = Column(String, nullable=True, default="neutral")
-    handoff_reason = Column(String, nullable=True)
+    customer_id = Column(String, ForeignKey("customers.id"), nullable=False)
+    status = Column(String, nullable=False, default="WAITING") # WAITING, LIVE, COMPLETED
+    current_node = Column(String, nullable=False, default="greeting_node")
+    escalation_reason = Column(String, nullable=True)
+    ai_summary = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
-    lead = relationship("Lead", back_populates="call_sessions")
-    messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
-    extracted_fields = relationship("ExtractedField", back_populates="session", cascade="all, delete-orphan")
+    customer = relationship("Customer", back_populates="call_sessions")
+    messages = relationship("ConversationMessage", back_populates="session", cascade="all, delete-orphan")
+    journey_data = relationship("JourneyData", back_populates="session", uselist=False, cascade="all, delete-orphan")
 
 
-class Message(Base):
-    __tablename__ = "messages"
+class ConversationMessage(Base):
+    __tablename__ = "conversation_messages"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     session_id = Column(String, ForeignKey("call_sessions.session_id"), nullable=False)
-    speaker = Column(String, nullable=False)  # 'AI' or 'Customer'
-    transcript = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    speaker = Column(String, nullable=False)  # 'ai' or 'customer'
+    text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     session = relationship("CallSession", back_populates="messages")
 
 
-class ExtractedField(Base):
-    __tablename__ = "extracted_fields"
+class JourneyData(Base):
+    __tablename__ = "journey_data"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(String, ForeignKey("call_sessions.session_id"), nullable=False)
-    field_name = Column(String, nullable=False)
-    field_value = Column(String, nullable=False)
-    confidence = Column(Float, nullable=True)
+    session_id = Column(String, ForeignKey("call_sessions.session_id"), primary_key=True)
+    moving = Column(Boolean, nullable=True)
+    address = Column(String, nullable=True)
+    fuel_type = Column(String, nullable=True)
+    solar = Column(Boolean, nullable=True)
+    life_support = Column(Boolean, nullable=True)
+    concession = Column(Boolean, nullable=True)
     
-    session = relationship("CallSession", back_populates="extracted_fields")
+    session = relationship("CallSession", back_populates="journey_data")
 
-
-class SalesConfig(Base):
-    __tablename__ = "sales_config"
-
-    node_name = Column(String, primary_key=True)
-    prompt_context = Column(Text, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
