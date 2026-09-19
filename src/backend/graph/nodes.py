@@ -1,14 +1,14 @@
 import json
 from pydantic import BaseModel
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_openai import ChatOpenAI
 from src.backend.schemas.state import CallState
 from src.backend.config import settings
 from src.logger import logger
 
 # Initialize the LLM
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.1, api_key=settings.gemini_api_key)
-chat_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7, api_key=settings.gemini_api_key)
+llm = ChatOpenAI(model="gpt-5-mini", temperature=0.1, api_key=settings.openai_api_key)
+chat_llm = ChatOpenAI(model="gpt-5-mini", temperature=0.7, api_key=settings.openai_api_key)
 
 def format_history(messages: list) -> list:
     """Convert state messages to LangChain message objects."""
@@ -26,7 +26,11 @@ def greeting_node(state: CallState) -> dict:
     
     prompt = "You are Aarav, an AI Energy expert from CIMET. Greet the user naturally, acknowledge they started comparing energy plans, and ask if they are moving into a new property or staying at their current address."
     
-    messages = [SystemMessage(content=prompt)]
+    # Gemini requires at least one HumanMessage in the conversation history
+    messages = [
+        SystemMessage(content=prompt),
+        HumanMessage(content="Start the conversation.")
+    ]
     response = chat_llm.invoke(messages)
     
     return {

@@ -86,38 +86,35 @@ workflow.add_node("concession_card_node", concession_card_node)
 workflow.add_node("handoff_node", handoff_node)
 workflow.add_node("complete_journey", complete_node)
 
-# Add Edges (Routing is primarily handled via the state's current_node, 
-# but LangGraph needs structural edges. We can use conditional edges based on state["current_node"])
-def route_next(state: CallState) -> str:
+# Add Edges
+# In a webhook architecture, the graph executes ONE node per turn, returns the response, and stops.
+# Therefore, all field nodes go to END.
+workflow.add_edge("greeting_node", END)
+workflow.add_edge("is_moving_node", END)
+workflow.add_edge("address_node", END)
+workflow.add_edge("fuel_type_node", END)
+workflow.add_edge("has_solar_node", END)
+workflow.add_edge("has_life_support_node", END)
+workflow.add_edge("concession_card_node", END)
+workflow.add_edge("handoff_node", END)
+workflow.add_edge("complete_journey", END)
+
+# We use a conditional entry point to route the incoming webhook request to the correct node
+def route_entry(state: CallState) -> str:
     if state.get("needs_handoff"):
         return "handoff_node"
-    
+        
     current = state.get("current_node")
     if not current:
         return "greeting_node"
-    
-    # Life Support triggers immediate handoff for this hackathon
+        
+    # Life Support triggers immediate handoff
     if state.get("extracted_fields", {}).get("has_life_support") is True:
-        state["handoff_reason"] = "Life Support requires specialized human assistance."
         return "handoff_node"
         
     return current
 
-# Set the entry point
-workflow.set_entry_point("greeting_node")
-
-# All nodes should route through the conditional edge to determine next steps dynamically
-workflow.add_conditional_edges("greeting_node", route_next)
-workflow.add_conditional_edges("is_moving_node", route_next)
-workflow.add_conditional_edges("address_node", route_next)
-workflow.add_conditional_edges("fuel_type_node", route_next)
-workflow.add_conditional_edges("has_solar_node", route_next)
-workflow.add_conditional_edges("has_life_support_node", route_next)
-workflow.add_conditional_edges("concession_card_node", route_next)
-
-# Terminal edges
-workflow.add_edge("handoff_node", END)
-workflow.add_edge("complete_journey", END)
+workflow.set_conditional_entry_point(route_entry)
 
 # Compile
 app = workflow.compile()
